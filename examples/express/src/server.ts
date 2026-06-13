@@ -5,6 +5,7 @@ import { forge } from "@blacksmith/core";
 import { HealthPlugin } from "@blacksmith/health";
 import { LoggingPlugin } from "@blacksmith/logging";
 import { MetricsPlugin } from "@blacksmith/metrics";
+import { RateLimitPlugin } from "@blacksmith/ratelimit";
 import { ShutdownPlugin } from "@blacksmith/shutdown";
 import { TracingPlugin } from "@blacksmith/tracing";
 
@@ -20,6 +21,12 @@ const runtime = await forge(app, {
     new CachePlugin({
       namespace: "example",
       defaultTtlMs: 30_000
+    }),
+    new RateLimitPlugin({
+      keyPrefix: "example",
+      limit: 60,
+      windowMs: 60_000,
+      skip: (req) => ["/health", "/liveness", "/readiness", "/metrics"].includes(req.path ?? "")
     }),
     new HealthPlugin({
       checks: {

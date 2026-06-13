@@ -411,7 +411,7 @@ const user = await cache.getOrSet(`user:${id}`, () => loadUser(id), {
 
 ## Rate Limiting Architecture
 
-Rate limiting should be enforced through middleware and backed by a pluggable store.
+Rate limiting is enforced through middleware and backed by a pluggable store. The current package ships with a fixed-window in-memory store and is shaped for a Redis store later.
 
 ```mermaid
 flowchart LR
@@ -432,6 +432,12 @@ Policies should support:
 - memory and Redis stores
 - standard rate limit headers
 - fail-open or fail-closed behavior
+
+The current plugin registers `ratelimit.store` and `ratelimit.policy` in the runtime registry and emits:
+
+- `rate_limit.allowed`
+- `rate_limit.blocked`
+- `rate_limit.error`
 
 ## Retry And Circuit Breaker Architecture
 

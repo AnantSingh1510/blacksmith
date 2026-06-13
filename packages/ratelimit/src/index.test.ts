@@ -1,0 +1,195 @@
+import { describe, expect, it, vi } from "vitest";
+import type {
+  BlacksmithRuntime,
+  HttpRequestLike,
+  HttpResponseLike,
+  Middleware
+} from "@blacksmith/core";
+import { EventBus, RuntimeRegistry } from "@blacksmith/core";
+import {
+  MemoryRateLimitStore,
+  RateLimitPlugin,
+  type RateLimitStore
+} from "./index.js";
+
+describe("MemoryRateLimitStore", () => {
+  it("resets counters after the window expires", async () => {
+    vi.useFakeTimers();
+    const store = new MemoryRateLimitStore();
+
+    expect(await store.increment("global:client", 1000)).toMatchObject({ count: 1 });
+    expect(await store.increment("global:client", 1000)).toMatchObject({ count: 2 });
+
+    vi.advanceTimersByTime(1001);
+
+    expect(await store.increment("global:client", 1000)).toMatchObject({ count: 1 });
+
+    vi.useRealTimers();
+  });
+});
+
+describe("RateLimitPlugin", () => {
+  it("allows requests within the limit and sets headers", async () => {
+    const runtime = fakeRuntime();
+    const plugin = new RateLimitPlugin({
+      identity: () => "client-1",
+      limit: 2,
+      windowMs: 60_000
+    });
+
+    plugin.register(runtime);
+    const res = createResponse();
+    const next = vi.fn();
+
+    await runtime.middleware[0]?.(request(), res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.headers["x-ratelimit-limit"]).toBe("2");
+    expect(res.headers["x-ratelimit-remaining"]).toBe("1");
+  });
+
+  it("blocks requests over the limit", async () => {
+    const runtime = fakeRuntime();
+    const blockedEvents: Record<string, unknown>[] = [];
+    runtime.events.on("rate_limit.blocked", (payload) => {
+      blockedEvents.push(payload);
+    });
+    const plugin = new RateLimitPlugin({
+      identity: () => "client-1",
+      limit: 1,
+      windowMs: 60_000
+    });
+
+    plugin.register(runtime);
+    await runtime.middleware[0]?.(request(), createResponse(), vi.fn());
+
+    const res = createResponse();
+    const next = vi.fn();
+    await runtime.middleware[0]?.(request(), res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(429);
+    expect(res.body).toEqual({ error: "Too many requests" });
+    expect(res.headers["retry-after"]).toBeDefined();
+    expect(blockedEvents).toHaveLength(1);
+  });
+
+  it("uses custom identity resolvers", async () => {
+    const runtime = fakeRuntime();
+    const plugin = new RateLimitPlugin({
+      identity: (req) => req.headers?.["x-api-key"] as string,
+      keyPrefix: "api",
+      limit: 1
+    });
+
+    plugin.register(runtime);
+    await runtime.middleware[0]?.(
+      request({ headers: { "x-api-key": "key-1" } }),
+      createResponse(),
+      vi.fn()
+    );
+
+    const store = runtime.registry.require<MemoryRateLimitStore>("ratelimit.store");
+    expect(store.size()).toBe(1);
+  });
+
+  it("skips matching requests", async () => {
+    const runtime = fakeRuntime();
+    const plugin = new RateLimitPlugin({
+      limit: 0,
+      skip: (req) => req.path === "/health"
+    });
+
+    plugin.register(runtime);
+
+    const next = vi.fn();
+    await runtime.middleware[0]?.(request({ path: "/health" }), createResponse(), next);
+
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("fails open when the store errors and failOpen is enabled", async () => {
+    const runtime = fakeRuntime();
+    const plugin = new RateLimitPlugin({
+      failOpen: true,
+      store: failingStore()
+    });
+
+    plugin.register(runtime);
+
+    const next = vi.fn();
+    await runtime.middleware[0]?.(request(), createResponse(), next);
+
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when the store errors and failOpen is disabled", async () => {
+    const runtime = fakeRuntime();
+    const plugin = new RateLimitPlugin({
+      failOpen: false,
+      store: failingStore()
+    });
+
+    plugin.register(runtime);
+
+    const res = createResponse();
+    const next = vi.fn();
+    await runtime.middleware[0]?.(request(), res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(429);
+  });
+});
+
+function fakeRuntime() {
+  const middleware: Middleware[] = [];
+  return {
+    app: {},
+    adapter: { name: "test", use: () => undefined, get: () => undefined },
+    events: new EventBus(),
+    registry: new RuntimeRegistry(),
+    serviceName: "test-service",
+    middleware,
+    use: (handler: Middleware) => {
+      middleware.push(handler);
+    },
+    get: () => undefined,
+    stop: async () => undefined
+  } satisfies BlacksmithRuntime & { middleware: Middleware[] };
+}
+
+function request(overrides: Partial<HttpRequestLike> = {}): HttpRequestLike {
+  return {
+    headers: {},
+    method: "GET",
+    path: "/users",
+    ...overrides
+  };
+}
+
+function createResponse(): HttpResponseLike & {
+  body?: unknown;
+  headers: Record<string, string>;
+} {
+  return {
+    statusCode: 200,
+    headers: {},
+    setHeader(name: string, value: string) {
+      this.headers[name.toLowerCase()] = value;
+    },
+    json(body: unknown) {
+      this.body = body;
+    },
+    send(body: unknown) {
+      this.body = body;
+    }
+  };
+}
+
+function failingStore(): RateLimitStore {
+  return {
+    async increment() {
+      throw new Error("store unavailable");
+    }
+  };
+}

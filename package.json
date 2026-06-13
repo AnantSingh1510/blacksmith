@@ -27,6 +27,7 @@
     "packages/health",
     "packages/logging",
     "packages/metrics",
+    "packages/ratelimit",
     "packages/shutdown",
     "packages/tracing",
     "examples/express"

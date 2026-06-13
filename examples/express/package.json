@@ -17,6 +17,7 @@
     "@blacksmith/health": "0.1.0",
     "@blacksmith/logging": "0.1.0",
     "@blacksmith/metrics": "0.1.0",
+    "@blacksmith/ratelimit": "0.1.0",
     "@blacksmith/shutdown": "0.1.0",
     "@blacksmith/tracing": "0.1.0",
     "express": "^4.21.2"

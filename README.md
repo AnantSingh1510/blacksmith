@@ -217,12 +217,12 @@ Current packages in this repository:
 - `@blacksmith/logging`
 - `@blacksmith/tracing`
 - `@blacksmith/metrics`
+- `@blacksmith/ratelimit`
 - `@blacksmith/health`
 - `@blacksmith/shutdown`
 
 Planned packages:
 
-- `@blacksmith/ratelimit`
 - `@blacksmith/retry`
 - `@blacksmith/queue`
 - `@blacksmith/locks`
