@@ -1,0 +1,32 @@
+{
+  "name": "blacksmith",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript-first production readiness toolkit for Node.js services.",
+  "type": "module",
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": [
+    "observability",
+    "metrics",
+    "health-checks",
+    "graceful-shutdown",
+    "nodejs",
+    "typescript"
+  ],
+  "license": "MIT",
+  "packageManager": "npm@11.11.1",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.8"
+  }
+}

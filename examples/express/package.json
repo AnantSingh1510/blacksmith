@@ -1,0 +1,27 @@
+{
+  "name": "@blacksmith/example-express",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/server.ts",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run src --passWithNoTests"
+  },
+  "dependencies": {
+    "@blacksmith/core": "0.1.0",
+    "@blacksmith/health": "0.1.0",
+    "@blacksmith/logging": "0.1.0",
+    "@blacksmith/metrics": "0.1.0",
+    "@blacksmith/shutdown": "0.1.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.8"
+  }
+}
