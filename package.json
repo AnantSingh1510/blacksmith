@@ -7,8 +7,8 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "typecheck": "npm run build && npm run typecheck --workspaces --if-present",
+    "test": "npm run build && npm run test --workspaces --if-present"
   },
   "keywords": [
     "observability",
@@ -21,8 +21,15 @@
   "license": "MIT",
   "packageManager": "npm@11.11.1",
   "workspaces": [
-    "packages/*",
-    "examples/*"
+    "packages/adapters",
+    "packages/core",
+    "packages/cache",
+    "packages/health",
+    "packages/logging",
+    "packages/metrics",
+    "packages/shutdown",
+    "packages/tracing",
+    "examples/express"
   ],
   "devDependencies": {
     "@types/node": "^22.10.7",

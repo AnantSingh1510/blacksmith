@@ -62,7 +62,7 @@ flowchart LR
   core -. "re-exports adapter types for convenience" .-> adapters
 ```
 
-`@blacksmith/core` owns the runtime. It creates the event bus, registry, request context middleware, and plugin lifecycle. It does not know how Redis, Prometheus, BullMQ, or OpenTelemetry work.
+`@blacksmith/core` owns the runtime. It creates the event bus, registry, request context middleware, and plugin lifecycle. It does not know how cache stores, Prometheus, BullMQ, or OpenTelemetry work.
 
 `@blacksmith/adapters` owns framework integration. An adapter turns framework-specific APIs into the narrow Blacksmith HTTP surface: `use(middleware)` and `get(path, handler)`.
 
@@ -363,7 +363,7 @@ Shutdown hooks should be idempotent. They may run after some requests have alrea
 
 ## Caching Architecture
 
-Caching should be an optional plugin that supports memory and Redis-backed storage. The cache layer should work both as an imperative API and, where TypeScript runtime metadata allows it, through decorators.
+Caching is an optional plugin that starts with an in-memory store and is designed for Redis-backed storage. The cache layer works as an imperative API first; decorators can sit on top later where TypeScript runtime metadata allows it.
 
 ```mermaid
 sequenceDiagram
@@ -398,6 +398,16 @@ Cache events should feed metrics and diagnostics:
 - `cache.error`
 
 The cache plugin should not assume every value is JSON. Serialization should be configurable per namespace.
+
+The current implementation exposes a runtime client through `runtime.registry.require("cache")`:
+
+```ts
+const cache = runtime.registry.require<CacheClient>("cache");
+
+const user = await cache.getOrSet(`user:${id}`, () => loadUser(id), {
+  ttlMs: 30_000
+});
+```
 
 ## Rate Limiting Architecture
 

@@ -213,6 +213,7 @@ Current packages in this repository:
 
 - `@blacksmith/core`
 - `@blacksmith/adapters`
+- `@blacksmith/cache`
 - `@blacksmith/logging`
 - `@blacksmith/tracing`
 - `@blacksmith/metrics`
@@ -221,7 +222,6 @@ Current packages in this repository:
 
 Planned packages:
 
-- `@blacksmith/cache`
 - `@blacksmith/ratelimit`
 - `@blacksmith/retry`
 - `@blacksmith/queue`
