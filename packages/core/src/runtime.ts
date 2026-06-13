@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
+import { detectHttpAdapter, type HttpAdapter, type Middleware } from "@blacksmith/adapters";
 import { EventBus } from "./events.js";
-import { detectHttpAdapter, type HttpAdapter, type Middleware } from "./http.js";
 import { RuntimeRegistry } from "./registry.js";
 
 export interface BlacksmithPlugin {

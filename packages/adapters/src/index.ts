@@ -1,3 +1,9 @@
+export interface RequestContext {
+  requestId: string;
+  startTime: bigint;
+  route?: string;
+}
+
 export interface HttpRequestLike {
   method?: string;
   path?: string;
@@ -31,12 +37,6 @@ export type RouteHandler = (
   req: HttpRequestLike,
   res: HttpResponseLike
 ) => void | Promise<void>;
-
-export interface RequestContext {
-  requestId: string;
-  startTime: bigint;
-  route?: string;
-}
 
 export interface HttpAdapter {
   readonly name: string;
@@ -83,40 +83,48 @@ interface FastifyLike {
 
 export function detectHttpAdapter(app: unknown): HttpAdapter {
   if (isExpressLike(app)) {
-    return {
-      name: "express",
-      use: (middleware) => {
-        app.use((req, res, next) => {
-          void Promise.resolve(middleware(req, res, next)).catch(next);
-        });
-      },
-      get: (path, handler) => {
-        app.get(path, (req, res, next) => {
-          void Promise.resolve(handler(req, res)).catch(next);
-        });
-      }
-    };
+    return createExpressAdapter(app);
   }
 
   if (isFastifyLike(app)) {
-    return {
-      name: "fastify",
-      use: (middleware) => {
-        app.addHook("onRequest", async (request, reply) => {
-          await middleware(toHttpRequest(request), toHttpResponse(reply), () => undefined);
-        });
-      },
-      get: (path, handler) => {
-        app.get(path, async (request, reply) => {
-          await handler(toHttpRequest(request), toHttpResponse(reply));
-        });
-      }
-    };
+    return createFastifyAdapter(app);
   }
 
   throw new Error(
     "Blacksmith could not detect a supported HTTP adapter. Pass an Express- or Fastify-like app."
   );
+}
+
+export function createExpressAdapter(app: ExpressLike): HttpAdapter {
+  return {
+    name: "express",
+    use: (middleware) => {
+      app.use((req, res, next) => {
+        void Promise.resolve(middleware(req, res, next)).catch(next);
+      });
+    },
+    get: (path, handler) => {
+      app.get(path, (req, res, next) => {
+        void Promise.resolve(handler(req, res)).catch(next);
+      });
+    }
+  };
+}
+
+export function createFastifyAdapter(app: FastifyLike): HttpAdapter {
+  return {
+    name: "fastify",
+    use: (middleware) => {
+      app.addHook("onRequest", async (request, reply) => {
+        await middleware(toHttpRequest(request), toHttpResponse(reply), () => undefined);
+      });
+    },
+    get: (path, handler) => {
+      app.get(path, async (request, reply) => {
+        await handler(toHttpRequest(request), toHttpResponse(reply));
+      });
+    }
+  };
 }
 
 function toHttpRequest(request: FastifyRequestLike): HttpRequestLike {

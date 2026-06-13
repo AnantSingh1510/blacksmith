@@ -1,7 +1,7 @@
 {
-  "name": "@blacksmith/core",
+  "name": "@blacksmith/adapters",
   "version": "0.1.0",
-  "description": "Core runtime and plugin lifecycle for Blacksmith.",
+  "description": "HTTP framework adapters for Blacksmith.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,20 +9,20 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "import": "./dist/express.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run src"
-  },
-  "dependencies": {
-    "@blacksmith/adapters": "0.1.0",
-    "nanoid": "^5.0.9"
+    "test": "vitest run src --passWithNoTests"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7",
+    "@types/express": "^5.0.0",
     "typescript": "^5.7.3",
     "vitest": "^4.1.8"
   }

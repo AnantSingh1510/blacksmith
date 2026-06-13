@@ -1,9 +1,11 @@
 import express from "express";
+import type { BlacksmithExpressRequest } from "@blacksmith/adapters/express";
 import { forge } from "@blacksmith/core";
 import { HealthPlugin } from "@blacksmith/health";
 import { LoggingPlugin } from "@blacksmith/logging";
 import { MetricsPlugin } from "@blacksmith/metrics";
 import { ShutdownPlugin } from "@blacksmith/shutdown";
+import { TracingPlugin } from "@blacksmith/tracing";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -12,6 +14,7 @@ await forge(app, {
   serviceName: "blacksmith-express-example",
   plugins: [
     new LoggingPlugin(),
+    new TracingPlugin(),
     new MetricsPlugin(),
     new HealthPlugin({
       checks: {
@@ -31,9 +34,7 @@ await forge(app, {
 });
 
 app.get("/users/:id", (req, res) => {
-  const request = req as typeof req & {
-    blacksmith?: { requestId: string };
-  };
+  const request = req as BlacksmithExpressRequest<typeof req>;
 
   res.json({
     id: req.params.id,

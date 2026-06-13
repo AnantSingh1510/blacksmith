@@ -11,11 +11,13 @@
     "test": "vitest run src --passWithNoTests"
   },
   "dependencies": {
+    "@blacksmith/adapters": "0.1.0",
     "@blacksmith/core": "0.1.0",
     "@blacksmith/health": "0.1.0",
     "@blacksmith/logging": "0.1.0",
     "@blacksmith/metrics": "0.1.0",
     "@blacksmith/shutdown": "0.1.0",
+    "@blacksmith/tracing": "0.1.0",
     "express": "^4.21.2"
   },
   "devDependencies": {

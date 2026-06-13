@@ -1,5 +1,7 @@
 export { EventBus, type EventHandler, type EventPayload } from "./events.js";
 export {
+  createExpressAdapter,
+  createFastifyAdapter,
   detectHttpAdapter,
   type HttpAdapter,
   type HttpRequestLike,
@@ -8,7 +10,7 @@ export {
   type NextFunctionLike,
   type RequestContext,
   type RouteHandler
-} from "./http.js";
+} from "@blacksmith/adapters";
 export { RuntimeRegistry } from "./registry.js";
 export {
   forge,
