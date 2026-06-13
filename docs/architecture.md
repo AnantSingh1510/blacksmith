@@ -363,7 +363,7 @@ Shutdown hooks should be idempotent. They may run after some requests have alrea
 
 ## Caching Architecture
 
-Caching is an optional plugin that starts with an in-memory store and is designed for Redis-backed storage. The cache layer works as an imperative API first; decorators can sit on top later where TypeScript runtime metadata allows it.
+Caching is an optional plugin with in-memory and Redis-backed stores. The cache layer works as an imperative API first; decorators can sit on top later where TypeScript runtime metadata allows it.
 
 ```mermaid
 sequenceDiagram
@@ -409,9 +409,20 @@ const user = await cache.getOrSet(`user:${id}`, () => loadUser(id), {
 });
 ```
 
+Redis support is provided as a store adapter, so applications can choose their Redis client:
+
+```ts
+const cacheStore = new RedisCacheStore({
+  client: redis,
+  keyPrefix: "billing:cache"
+});
+
+new CachePlugin({ store: cacheStore });
+```
+
 ## Rate Limiting Architecture
 
-Rate limiting is enforced through middleware and backed by a pluggable store. The current package ships with a fixed-window in-memory store and is shaped for a Redis store later.
+Rate limiting is enforced through middleware and backed by a pluggable store. The current package ships with fixed-window in-memory and Redis stores.
 
 ```mermaid
 flowchart LR
@@ -438,6 +449,21 @@ The current plugin registers `ratelimit.store` and `ratelimit.policy` in the run
 - `rate_limit.allowed`
 - `rate_limit.blocked`
 - `rate_limit.error`
+
+Redis-backed counters use Redis `INCR` plus millisecond expiry:
+
+```ts
+const rateLimitStore = new RedisRateLimitStore({
+  client: redis,
+  keyPrefix: "billing:ratelimit"
+});
+
+new RateLimitPlugin({
+  store: rateLimitStore,
+  limit: 100,
+  windowMs: 60_000
+});
+```
 
 ## Retry And Circuit Breaker Architecture
 

@@ -20,6 +20,32 @@ export interface CacheStore {
   clear(namespace?: string): Promise<void>;
 }
 
+export interface CacheSerializer {
+  serialize<TValue>(value: TValue): string;
+  deserialize<TValue>(value: string): TValue;
+}
+
+export interface RedisCacheClient {
+  get(key: string): Promise<string | null | undefined>;
+  set(
+    key: string,
+    value: string,
+    options?: {
+      PX?: number;
+    }
+  ): Promise<unknown>;
+  del(key: string | string[]): Promise<number>;
+  keys?(pattern: string): Promise<string[]>;
+  scanIterator?(options: { MATCH: string; COUNT?: number }): AsyncIterable<string | string[]>;
+}
+
+export interface RedisCacheStoreOptions {
+  client: RedisCacheClient;
+  keyPrefix?: string;
+  serializer?: CacheSerializer;
+  scanCount?: number;
+}
+
 export interface CacheClientOptions {
   defaultTtlMs?: number;
   namespace?: string;
@@ -84,6 +110,84 @@ export class MemoryCacheStore implements CacheStore {
         this.entries.delete(key);
       }
     }
+  }
+}
+
+export class RedisCacheStore implements CacheStore {
+  private readonly client: RedisCacheClient;
+  private readonly keyPrefix: string;
+  private readonly serializer: CacheSerializer;
+  private readonly scanCount: number;
+
+  constructor(options: RedisCacheStoreOptions) {
+    this.client = options.client;
+    this.keyPrefix = options.keyPrefix ?? "blacksmith:cache";
+    this.serializer = options.serializer ?? jsonSerializer;
+    this.scanCount = options.scanCount ?? 100;
+  }
+
+  async get<TValue>(key: string): Promise<TValue | undefined> {
+    const value = await this.client.get(this.key(key));
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+
+    return this.serializer.deserialize<TValue>(value);
+  }
+
+  async set<TValue>(key: string, value: TValue, options: CacheSetOptions = {}): Promise<void> {
+    const storageKey = this.key(key);
+    const serialized = this.serializer.serialize(value);
+
+    if (options.ttlMs === undefined) {
+      await this.client.set(storageKey, serialized);
+      return;
+    }
+
+    await this.client.set(storageKey, serialized, { PX: options.ttlMs });
+  }
+
+  async delete(key: string): Promise<boolean> {
+    return (await this.client.del(this.key(key))) > 0;
+  }
+
+  async clear(namespace?: string): Promise<void> {
+    const pattern = namespace
+      ? `${this.key(`${namespace}:`)}*`
+      : `${this.key("")}*`;
+    const keys = await this.findKeys(pattern);
+
+    if (keys.length > 0) {
+      await this.client.del(keys);
+    }
+  }
+
+  key(key: string): string {
+    return `${this.keyPrefix}:${key}`;
+  }
+
+  private async findKeys(pattern: string): Promise<string[]> {
+    if (this.client.scanIterator) {
+      const keys: string[] = [];
+      for await (const item of this.client.scanIterator({
+        COUNT: this.scanCount,
+        MATCH: pattern
+      })) {
+        if (Array.isArray(item)) {
+          keys.push(...item);
+        } else {
+          keys.push(item);
+        }
+      }
+
+      return keys;
+    }
+
+    if (this.client.keys) {
+      return this.client.keys(pattern);
+    }
+
+    throw new Error("Redis cache store requires scanIterator or keys to clear namespaces.");
   }
 }
 
@@ -195,3 +299,12 @@ export class CachePlugin implements BlacksmithPlugin {
 function isExpired(entry: CacheEntry, now: number): boolean {
   return entry.expiresAt !== undefined && entry.expiresAt <= now;
 }
+
+const jsonSerializer: CacheSerializer = {
+  serialize(value) {
+    return JSON.stringify(value);
+  },
+  deserialize(value) {
+    return JSON.parse(value);
+  }
+};

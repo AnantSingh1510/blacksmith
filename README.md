@@ -155,6 +155,20 @@ The framework still handles routing. Blacksmith watches the operational lifecycl
 - Standard rate limit headers
 - Configurable fail-open or fail-closed behavior
 
+Redis support is provided through store adapters, so applications can bring the Redis client they already use:
+
+```ts
+new CachePlugin({
+  store: new RedisCacheStore({ client: redis, keyPrefix: "billing:cache" })
+});
+
+new RateLimitPlugin({
+  store: new RedisRateLimitStore({ client: redis, keyPrefix: "billing:ratelimit" }),
+  limit: 100,
+  windowMs: 60_000
+});
+```
+
 ### Retries And Circuit Breakers
 
 - Exponential backoff

@@ -23,6 +23,18 @@ export interface RateLimitStore {
   reset?(key: string): Promise<void>;
 }
 
+export interface RedisRateLimitClient {
+  incr(key: string): Promise<number>;
+  pExpire(key: string, milliseconds: number): Promise<number | boolean>;
+  pTTL(key: string): Promise<number>;
+  del?(key: string): Promise<number>;
+}
+
+export interface RedisRateLimitStoreOptions {
+  client: RedisRateLimitClient;
+  keyPrefix?: string;
+}
+
 export type RateLimitIdentityResolver = (
   req: HttpRequestLike
 ) => string | Promise<string>;
@@ -76,6 +88,44 @@ export class MemoryRateLimitStore implements RateLimitStore {
         this.states.delete(key);
       }
     }
+  }
+}
+
+export class RedisRateLimitStore implements RateLimitStore {
+  private readonly client: RedisRateLimitClient;
+  private readonly keyPrefix: string;
+
+  constructor(options: RedisRateLimitStoreOptions) {
+    this.client = options.client;
+    this.keyPrefix = options.keyPrefix ?? "blacksmith:ratelimit";
+  }
+
+  async increment(key: string, windowMs: number): Promise<RateLimitState> {
+    const storageKey = this.key(key);
+    const count = await this.client.incr(storageKey);
+
+    if (count === 1) {
+      await this.client.pExpire(storageKey, windowMs);
+    }
+
+    let ttl = await this.client.pTTL(storageKey);
+    if (ttl < 0) {
+      await this.client.pExpire(storageKey, windowMs);
+      ttl = windowMs;
+    }
+
+    return {
+      count,
+      resetAt: Date.now() + ttl
+    };
+  }
+
+  async reset(key: string): Promise<void> {
+    await this.client.del?.(this.key(key));
+  }
+
+  key(key: string): string {
+    return `${this.keyPrefix}:${key}`;
   }
 }
 

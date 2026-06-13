@@ -9,6 +9,8 @@ import { EventBus, RuntimeRegistry } from "@blacksmith/core";
 import {
   MemoryRateLimitStore,
   RateLimitPlugin,
+  RedisRateLimitStore,
+  type RedisRateLimitClient,
   type RateLimitStore
 } from "./index.js";
 
@@ -23,6 +25,27 @@ describe("MemoryRateLimitStore", () => {
     vi.advanceTimersByTime(1001);
 
     expect(await store.increment("global:client", 1000)).toMatchObject({ count: 1 });
+
+    vi.useRealTimers();
+  });
+});
+
+describe("RedisRateLimitStore", () => {
+  it("increments shared Redis counters with an expiry window", async () => {
+    vi.useFakeTimers();
+    const client = new FakeRedisRateLimitClient();
+    const store = new RedisRateLimitStore({ client });
+
+    const first = await store.increment("global:client", 1000);
+    const second = await store.increment("global:client", 1000);
+
+    expect(first.count).toBe(1);
+    expect(second.count).toBe(2);
+    expect(client.expirations.get("blacksmith:ratelimit:global:client")).toBe(1000);
+
+    vi.advanceTimersByTime(1001);
+
+    await expect(store.increment("global:client", 1000)).resolves.toMatchObject({ count: 1 });
 
     vi.useRealTimers();
   });
@@ -192,4 +215,47 @@ function failingStore(): RateLimitStore {
       throw new Error("store unavailable");
     }
   };
+}
+
+class FakeRedisRateLimitClient implements RedisRateLimitClient {
+  readonly values = new Map<string, number>();
+  readonly expirations = new Map<string, number>();
+  private readonly expiresAt = new Map<string, number>();
+
+  async incr(key: string): Promise<number> {
+    this.prune(key);
+    const next = (this.values.get(key) ?? 0) + 1;
+    this.values.set(key, next);
+    return next;
+  }
+
+  async pExpire(key: string, milliseconds: number): Promise<boolean> {
+    this.expirations.set(key, milliseconds);
+    this.expiresAt.set(key, Date.now() + milliseconds);
+    return true;
+  }
+
+  async pTTL(key: string): Promise<number> {
+    this.prune(key);
+    const expiresAt = this.expiresAt.get(key);
+    if (expiresAt === undefined) {
+      return this.values.has(key) ? -1 : -2;
+    }
+
+    return Math.max(expiresAt - Date.now(), 0);
+  }
+
+  async del(key: string): Promise<number> {
+    const deleted = this.values.delete(key) ? 1 : 0;
+    this.expiresAt.delete(key);
+    return deleted;
+  }
+
+  private prune(key: string): void {
+    const expiresAt = this.expiresAt.get(key);
+    if (expiresAt !== undefined && expiresAt <= Date.now()) {
+      this.values.delete(key);
+      this.expiresAt.delete(key);
+    }
+  }
 }
